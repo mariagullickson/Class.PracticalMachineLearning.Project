@@ -1,0 +1,51 @@
+Predicting Exercise Styles
+==========================
+
+The goal of this project is to use accelerometer data from 6 participants while
+they exercies to predict the manner in which they are exercising.
+
+First we load up the data and split it into a training set (75%) and a test set (25%).
+```{r loadData, cache=TRUE}
+library(caret, quietly=TRUE)
+data <- read.csv('pml-training.csv')
+inTraining <- createDataPartition(data$classe, p=0.75, list=FALSE)
+training <- data[inTraining,]
+testing <- data[-inTraining,]
+```
+
+We are interested in predicting based on acceleromater data, so next we limit our
+testing and training predictors to just those items.  Once we've pulled out the
+predictors and outcomes we care about, we can remove the original full data set to
+save on a bit of memory.
+```{r limitData, cache=TRUE}
+trainOutcome <- training[, names(training) == "classe"]
+trainAccelerometers <- training[, grepl("^accel", names(training))]
+testOutcome <- testing[, names(testing) == "classe"]
+testAccelerometers <- testing[, grepl("^accel", names(testing))]
+rm(data)
+```
+
+Now that our data is in shape, we train a Generalize Boosted Regression Model (GBM).
+We use 4-fold cross validation repeating with 3 full sets of folds.  This reduces the
+variance in our results, and validates that we aren't overfitting our model to the
+test data.
+```{r fitModel, cache=TRUE}
+library(survival, quietly=TRUE)
+library(gbm, quietly=TRUE)
+library(splines, quietly=TRUE)
+fitControl <- trainControl(method="repeatedcv", number=4, repeats=3)
+modelFit <- train(trainOutcome ~ ., data=trainAccelerometers, method="gbm", trControl=fitControl, verbose=FALSE)
+```
+
+Finally we do some predictions on our test data and look at the confusion matrix
+to see how it performed.
+```{r predictionAccuracy, cache=TRUE}
+predictions <- predict(modelFit, testAccelerometers)
+cm <- confusionMatrix(predictions, testOutcome)
+accuracyPercent <- cm$overall['Accuracy'] * 100
+cm
+```
+
+We can see that the our model has `r accuracyPercent`% accuracy, and estimate
+our out-of-sample error rate to be `r 100-accuracyPercent`% based on this.
+
