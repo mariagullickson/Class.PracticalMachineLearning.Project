@@ -4,33 +4,32 @@ Predicting Exercise Styles
 The goal of this project is to use accelerometer data from 6 participants while
 they exercise to predict the manner in which they are exercising.
 
-First we load up the data and split it into a training set (75%) and a test set (25%).
+First we load up the data and split it into a training set (75%) and a validation set (25%).
 ```{r loadData, cache=TRUE}
 library(caret, quietly=TRUE)
 data <- read.csv('pml-training.csv')
 inTraining <- createDataPartition(data$classe, p=0.75, list=FALSE)
 training <- data[inTraining,]
-testing <- data[-inTraining,]
+validation <- data[-inTraining,]
 ```
 
 We are interested in predicting based on accelerometer data, so next we limit our
-testing and training predictors to just those items.  Once we've pulled out the
+training and validation predictors to just those items.  Once we've pulled out the
 predictors and outcomes we care about, we can remove the original full data set to
 save on a bit of memory.
 ```{r limitData, cache=TRUE}
 trainOutcome <- training[, names(training) == "classe"]
 trainAccelerometers <- training[, grepl("^accel", names(training))]
-testOutcome <- testing[, names(testing) == "classe"]
-testAccelerometers <- testing[, grepl("^accel", names(testing))]
+validationOutcome <- validation[, names(validation) == "classe"]
+validationAccelerometers <- validation[, grepl("^accel", names(validation))]
 rm(data)
 ```
 
-Now that our data is in shape, we can try out some modeling.  We will test out several
+Now that our data is in shape, we can try out some modeling.  We will try out several
 models, using 5-fold cross validation repeating with 3 full sets of folds.  This reduces the
 variance in our results, and validates that we aren't overfitting our model to the
-test data.
+training data.
 ```{r fitSetup, cache=TRUE}
-
 library(survival, quietly=TRUE)
 library(gbm, quietly=TRUE)
 library(splines, quietly=TRUE)
@@ -41,8 +40,8 @@ First we will try out a Linear Discriminant Analysis Model (LDA).
 ```{r lda, cache=TRUE}
 ldaFit <- train(trainOutcome ~ ., data=trainAccelerometers, method="lda",
                 trControl=fitControl, verbose=FALSE)
-ldaPredictions <- predict(ldaFit, testAccelerometers)
-ldaCM <- confusionMatrix(ldaPredictions, testOutcome)
+ldaPredictions <- predict(ldaFit, validationAccelerometers)
+ldaCM <- confusionMatrix(ldaPredictions, validationOutcome)
 ldaAccuracy <- ldaCM$overall['Accuracy'] * 100
 ldaCM
 ```
@@ -51,8 +50,8 @@ Next we will try out a Generalize Boosted Regression Model (GBM).
 ```{r gbm, cache=TRUE}
 gbmFit <- train(trainOutcome ~ ., data=trainAccelerometers, method="gbm",
                 trControl=fitControl, verbose=FALSE)
-gbmPredictions <- predict(gbmFit, testAccelerometers)
-gbmCM <- confusionMatrix(gbmPredictions, testOutcome)
+gbmPredictions <- predict(gbmFit, validationAccelerometers)
+gbmCM <- confusionMatrix(gbmPredictions, validationOutcome)
 gbmAccuracy <- gbmCM$overall['Accuracy'] * 100
 gbmCM
 ```
@@ -61,8 +60,8 @@ Then we will try out a Random Forest Model (RF).
 ```{r rf, cache=TRUE}
 rfFit <- train(trainOutcome ~ ., data=trainAccelerometers, method="rf",
                trControl=fitControl, verbose=FALSE)
-rfPredictions <- predict(rfFit, testAccelerometers)
-rfCM <- confusionMatrix(rfPredictions, testOutcome)
+rfPredictions <- predict(rfFit, validationAccelerometers)
+rfCM <- confusionMatrix(rfPredictions, validationOutcome)
 rfAccuracy <- rfCM$overall['Accuracy'] * 100
 rfCM
 ```
@@ -83,5 +82,24 @@ grid.arrange(accuracyPlot, errorPlot, ncol=2)
 ```
 
 From this, we can see that the Random Forest model clearly has the highest accuracy (`r rfAccuracy`%),
-and thus the lowest estimated out-of-sample error rate (`r 100-rfAccuracy`%).  This is the model we will
-choose to use.
+and thus the lowest estimated out-of-sample error rate (`r 100-rfAccuracy`%).  This is the model
+we will choose to use.
+
+Finally it's time to generate results for the test data.  We will run the prediction using
+the Random Forest model we generated and spit the results out to files.
+```
+testing <- read.csv('pml-testing.csv')
+testAccelerometers <- testing[, grepl("^accel", names(testing))]
+answers <- predict(rfFit, testAccelerometers)
+
+pml_write_files = function(x)
+{
+  n = length(x)
+  for (i in 1:n)
+  {
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answers)
+```
