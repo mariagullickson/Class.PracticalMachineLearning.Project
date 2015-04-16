@@ -2,7 +2,7 @@ Predicting Exercise Styles
 ==========================
 
 The goal of this project is to use accelerometer data from 6 participants while
-they exercies to predict the manner in which they are exercising.
+they exercise to predict the manner in which they are exercising.
 
 First we load up the data and split it into a training set (75%) and a test set (25%).
 
@@ -14,7 +14,7 @@ training <- data[inTraining,]
 testing <- data[-inTraining,]
 ```
 
-We are interested in predicting based on acceleromater data, so next we limit our
+We are interested in predicting based on accelerometer data, so next we limit our
 testing and training predictors to just those items.  Once we've pulled out the
 predictors and outcomes we care about, we can remove the original full data set to
 save on a bit of memory.
